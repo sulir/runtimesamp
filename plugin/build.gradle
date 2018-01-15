@@ -1,0 +1,24 @@
+plugins {
+    id 'org.jetbrains.intellij' version '0.2.17'
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+intellij {
+    version '2017.3.2'
+}
+
+patchPluginXml {
+    changeNotes = 'This is an early alpha version.'
+}
+
+buildPlugin {
+    destinationDir project.file('../dist')
+}
+
+clean {
+    //noinspection GroovyAssignabilityCheck
+    delete buildPlugin.archivePath
+}

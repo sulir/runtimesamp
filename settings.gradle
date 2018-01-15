@@ -1,0 +1,4 @@
+rootProject.name = 'RuntimeSamp'
+include 'agent', 'plugin'
+project(':agent').name = 'runtimesamp-agent'
+project(':plugin').name = 'runtimesamp-plugin'

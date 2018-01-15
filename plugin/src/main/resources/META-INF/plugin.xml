@@ -1,0 +1,19 @@
+<idea-plugin>
+    <id>com.github.sulir.runtimesamp</id>
+    <name>RuntimeSamp</name>
+    <vendor>Matúš Sulír</vendor>
+
+    <description><![CDATA[
+    Display examples of variable values at the end of each line.
+    ]]></description>
+
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Add your extensions here -->
+    </extensions>
+
+    <actions>
+        <!-- Add your actions here -->
+    </actions>
+</idea-plugin>
