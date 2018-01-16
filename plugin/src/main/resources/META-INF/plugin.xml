@@ -10,10 +10,10 @@
     <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Add your extensions here -->
+        <editor.linePainter implementation="com.sulir.github.runtimesamp.plugin.ValueLinePainter"/>
     </extensions>
 
     <actions>
-        <!-- Add your actions here -->
+
     </actions>
 </idea-plugin>
