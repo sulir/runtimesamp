@@ -1,9 +1,6 @@
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
-    compile 'org.ow2.asm:asm:6.0'
-    compile 'org.ow2.asm:asm-tree:6.0'
-    compile 'org.ow2.asm:asm-analysis:6.0'
-    compile 'org.ow2.asm:asm-util:6.0'
+    compile 'org.mutabilitydetector:asm-nonclassloadingextensions:1.0-rc1'
 }
 
 jar {
