@@ -5,6 +5,14 @@ subprojects {
     apply plugin: 'java'
     sourceCompatibility = 1.8
 
+    apply plugin: 'idea'
+    idea {
+        module {
+            downloadSources = true
+            downloadJavadoc = true
+        }
+    }
+
     repositories {
         mavenCentral()
     }
