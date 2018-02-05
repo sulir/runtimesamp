@@ -1,9 +1,7 @@
 package com.github.sulir.runtimesamp.agent;
 
 import org.objectweb.asm.Label;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.LocalVariableNode;
-import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,11 +25,22 @@ public class VariableMap {
         return variablesAtLine.values();
     }
 
-    public void lineEncountered() {
-        variablesAtLine.clear();
+    public void update(AbstractInsnNode instruction, MethodTransformer transformer) {
+        switch (instruction.getType()) {
+            case AbstractInsnNode.LABEL:
+                updateScope((LabelNode) instruction);
+                break;
+            case AbstractInsnNode.LINE:
+                variablesAtLine.clear();
+                break;
+            default:
+                Variable variable = Variable.fromInstruction(instruction, transformer);
+                if (variable != null)
+                    variablesAtLine.put(variable.getName(), variable);
+        }
     }
 
-    public void labelEncountered(LabelNode label) {
+    private void updateScope(LabelNode label) {
         for (LocalVariableNode variable : starts.getOrDefault(label.getLabel(), new ArrayList<>(0))) {
             localVariablesInScope.put(variable.index, variable);
         }
@@ -46,9 +55,5 @@ public class VariableMap {
                     variables.remove();
             }
         }
-    }
-
-    public void variableInstructionEncountered(Variable variable) {
-        variablesAtLine.put(variable.getName(), variable);
     }
 }

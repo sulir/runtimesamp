@@ -11,37 +11,41 @@ import java.util.Iterator;
 
 public class MethodTransformer {
     private final InsnList instructions;
+    private final LineMap lineMap;
     private final FieldAnalyzer fieldAnalyzer;
     private final VariableMap variableMap;
     private final int passVariable;
 
     public MethodTransformer(MethodNode method) {
         instructions = method.instructions;
+        lineMap = new LineMap(method);
         fieldAnalyzer = new FieldAnalyzer(method);
         variableMap = new VariableMap(method);
         passVariable = method.maxLocals;
     }
 
     public void transform() {
+        lineMap.construct();
         fieldAnalyzer.analyze();
-        instructions.insert(getResetPass());
 
         Iterator<AbstractInsnNode> iterator = instructions.iterator();
+        instructions.insert(getResetPass());
+
         while (iterator.hasNext()) {
             AbstractInsnNode node = iterator.next();
-            Instruction instruction = new Instruction(node, this);
+            variableMap.update(node, this);
 
-            if (node instanceof LabelNode)
-                variableMap.labelEncountered(((LabelNode) node));
+            if (lineMap.getLine(node) == LineMap.NO_LINE)
+                continue;
 
-            if (instruction.hasVariable())
-                variableMap.variableInstructionEncountered(instruction.getVariable());
+            SourceInstruction source = new SourceInstruction(node, lineMap);
 
-            if (instruction.isLastAtLine())
-                instrumentAfter(node, iterator);
-
-            if (node instanceof LineNumberNode)
-                variableMap.lineEncountered();
+            if (source.canGoToOtherLine()) {
+                if (source.isSequential())
+                    instructions.insert(node, getInstrumentation(source));
+                else
+                    instructions.insertBefore(node, getInstrumentation(source));
+            }
         }
     }
 
@@ -60,8 +64,16 @@ public class MethodTransformer {
         return resetPass;
     }
 
-    private void instrumentAfter(AbstractInsnNode node, Iterator<AbstractInsnNode> iterator) {
+    private InsnList getInstrumentation(SourceInstruction source) {
         InsnList list = new InsnList();
+        LabelNode skipAll = new LabelNode();
+
+        for (Branch branch : source.getBranches()) {
+            if (branch.isSameLine()) {
+                list.add(branch.getConditionOperandDuplication());
+                list.add(new JumpInsnNode(branch.getCondition(), skipAll));
+            }
+        }
 
         for (Variable variable : variableMap.getVariablesAtLine()) {
             list.add(new LdcInsnNode(variable.getName()));
@@ -69,7 +81,8 @@ public class MethodTransformer {
             list.add(Data.getInvokeStoreVariable());
         }
 
-        instructions.insert(node, list);
+        list.add(skipAll);
+        return list;
     }
 
     private void printInstructions() {
