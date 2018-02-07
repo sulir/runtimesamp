@@ -15,6 +15,7 @@ public class MethodTransformer {
     private final FieldAnalyzer fieldAnalyzer;
     private final VariableMap variableMap;
     private final int passVariable;
+    private InsnList inserted;
 
     public MethodTransformer(MethodNode method) {
         instructions = method.instructions;
@@ -32,19 +33,22 @@ public class MethodTransformer {
         instructions.insert(getResetPass());
 
         while (iterator.hasNext()) {
-            AbstractInsnNode node = iterator.next();
-            variableMap.update(node, this);
+            AbstractInsnNode instruction = iterator.next();
+            variableMap.update(instruction, this);
 
-            if (lineMap.getLine(node) == LineMap.NO_LINE)
+            if (lineMap.getLine(instruction) == LineMap.NO_LINE)
                 continue;
 
-            SourceInstruction source = new SourceInstruction(node, lineMap);
+            ControlNode node = new ControlNode(instruction, lineMap);
 
-            if (source.canGoToOtherLine()) {
-                if (source.isSequential())
-                    instructions.insert(node, getInstrumentation(source));
+            if (node.canGoToOtherLine()) {
+                inserted = new InsnList();
+                generateInstrumentation(node);
+
+                if (node.isSequential())
+                    instructions.insert(instruction, inserted);
                 else
-                    instructions.insertBefore(node, getInstrumentation(source));
+                    instructions.insertBefore(instruction, inserted);
             }
         }
     }
@@ -59,30 +63,72 @@ public class MethodTransformer {
 
     private InsnList getResetPass() {
         InsnList resetPass = new InsnList();
-        resetPass.add(new InsnNode(Opcodes.LCONST_0));
-        resetPass.add(new VarInsnNode(Opcodes.LSTORE, passVariable));
+        resetPass.add(new InsnNode(Opcodes.ICONST_0));
+        resetPass.add(new VarInsnNode(Opcodes.ISTORE, passVariable));
         return resetPass;
     }
 
-    private InsnList getInstrumentation(SourceInstruction source) {
-        InsnList list = new InsnList();
-        LabelNode skipAll = new LabelNode();
+    private void generateInstrumentation(ControlNode node) {
+        int lineId = lineMap.getLineId(node.getInstruction());
+        LabelNode skipToEnd = new LabelNode();
 
-        for (Branch branch : source.getBranches()) {
-            if (branch.isSameLine()) {
-                list.add(branch.getConditionOperandDuplication());
-                list.add(new JumpInsnNode(branch.getCondition(), skipAll));
-            }
+        skipIfLineWillStay(node, skipToEnd);
+        skipIfNoHitsLeft(lineId, skipToEnd);
+        updateIds(lineId);
+        storeVariables();
+        resetPassIfBackward(node, skipToEnd);
+
+        inserted.add(skipToEnd);
+    }
+
+    private void skipIfLineWillStay(ControlNode node, LabelNode skip) {
+        for (Branch branch : node.getBranches()) {
+            if (branch.getDirection() == Branch.Direction.SAME_LINE)
+                branch.getConditionalJump(skip);
         }
+    }
 
+    private void skipIfNoHitsLeft(int lineId, LabelNode skip) {
+        inserted.add(Data.getReadLineHitsLeft());
+        inserted.add(getPushInstruction(lineId));
+        inserted.add(new InsnNode(Opcodes.BALOAD));
+        inserted.add(new JumpInsnNode(Opcodes.IFEQ, skip));
+    }
+
+    private void updateIds(int lineId) {
+        inserted.add(getPushInstruction(lineId));
+        inserted.add(new VarInsnNode(Opcodes.ILOAD, passVariable));
+        inserted.add(Data.getInvokeUpdateIds());
+        inserted.add(new VarInsnNode(Opcodes.ISTORE, passVariable));
+    }
+
+    private void storeVariables() {
         for (Variable variable : variableMap.getVariablesAtLine()) {
-            list.add(new LdcInsnNode(variable.getName()));
-            list.add(variable.getBoxedLoad());
-            list.add(Data.getInvokeStoreVariable());
+            inserted.add(new LdcInsnNode(variable.getName()));
+            inserted.add(variable.getBoxedLoad());
+            inserted.add(new VarInsnNode(Opcodes.ILOAD, passVariable));
+            inserted.add(Data.getInvokeStoreVariable());
+        }
+    }
+
+    private void resetPassIfBackward(ControlNode node, LabelNode skip) {
+        if (node.hasNoBackwardBranch())
+            return;
+
+        for (Branch branch : node.getBranches()) {
+            if (branch.getDirection() == Branch.Direction.FORWARD)
+                inserted.add(branch.getConditionalJump(skip));
         }
 
-        list.add(skipAll);
-        return list;
+        inserted.add(getResetPass());
+    }
+
+    private AbstractInsnNode getPushInstruction(int constant) {
+        if (constant <= Short.MAX_VALUE) {
+            return new IntInsnNode(Opcodes.SIPUSH, constant);
+        } else {
+            return new LdcInsnNode(constant);
+        }
     }
 
     private void printInstructions() {

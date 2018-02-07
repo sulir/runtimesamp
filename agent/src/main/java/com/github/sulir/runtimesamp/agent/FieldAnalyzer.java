@@ -18,11 +18,11 @@ public class FieldAnalyzer {
 
     private class IsThisInterpreter extends BasicInterpreter {
         @Override
-        public BasicValue copyOperation(AbstractInsnNode node, BasicValue value) throws AnalyzerException {
-            if (node.getOpcode() == ALOAD && ((VarInsnNode) node).var == 0)
+        public BasicValue copyOperation(AbstractInsnNode instruction, BasicValue value) throws AnalyzerException {
+            if (instruction.getOpcode() == ALOAD && ((VarInsnNode) instruction).var == 0)
                 return THIS;
             else
-                return super.copyOperation(node, value);
+                return super.copyOperation(instruction, value);
         }
 
         @Override

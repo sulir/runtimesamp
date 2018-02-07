@@ -6,12 +6,12 @@ import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
 
-public class SourceInstruction {
+public class ControlNode {
     private final AbstractInsnNode instruction;
     private final LineMap lineMap;
     private final Branch[] branches;
 
-    public SourceInstruction(AbstractInsnNode instruction, LineMap lineMap) {
+    public ControlNode(AbstractInsnNode instruction, LineMap lineMap) {
         this.instruction = instruction;
         this.lineMap = lineMap;
         branches = computeBranches();
@@ -47,6 +47,10 @@ public class SourceInstruction {
         }
     }
 
+    public AbstractInsnNode getInstruction() {
+        return instruction;
+    }
+
     public Branch[] getBranches() {
         return branches;
     }
@@ -57,9 +61,17 @@ public class SourceInstruction {
 
     public boolean canGoToOtherLine() {
         for (Branch branch : branches) {
-            if (!branch.isSameLine())
+            if (branch.getDirection() != Branch.Direction.SAME_LINE)
                 return true;
         }
         return false;
+    }
+
+    public boolean hasNoBackwardBranch() {
+        for (Branch branch : branches) {
+            if (branch.getDirection() == Branch.Direction.BACKWARD)
+                return false;
+        }
+        return true;
     }
 }
