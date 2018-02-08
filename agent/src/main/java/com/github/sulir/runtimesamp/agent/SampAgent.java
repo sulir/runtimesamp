@@ -20,10 +20,10 @@ public class SampAgent {
                 if (className != null && include.matcher(className).matches()
                         && !exclude.matcher(className).matches()) {
                     hierarchy.setClassLoader(loader);
-                    ClassTransformer transformer = new ClassTransformer(classfileBuffer, hierarchy);
+                    ClassTransformer transformer = new ClassTransformer(className, classfileBuffer, hierarchy);
                     return transformer.transform();
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 e.printStackTrace();
             }
 

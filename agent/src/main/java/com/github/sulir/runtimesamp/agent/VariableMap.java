@@ -21,8 +21,8 @@ public class VariableMap {
         return localVariablesInScope.get(index);
     }
 
-    public Collection<Variable> getVariablesAtLine() {
-        return variablesAtLine.values();
+    public Variable[] getVariablesAtLine() {
+        return variablesAtLine.values().toArray(new Variable[0]);
     }
 
     public void update(AbstractInsnNode instruction, MethodTransformer transformer) {

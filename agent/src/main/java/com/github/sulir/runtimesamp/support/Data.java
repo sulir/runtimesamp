@@ -15,23 +15,95 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public class Data {
+    public static int VARIABLE_METHODS = 4;
     private static final byte HITS_PER_LINE = 1;
     private static final ExecutorService executor = Executors.newCachedThreadPool(new ToStringThread.Factory());
     private static final FieldInsnNode readLineHitsLeft = getReadHitsInstruction();
     private static final MethodInsnNode invokeUpdateIds = getInvokeInstruction("updateIds");
     private static final MethodInsnNode invokeStoreVariable = getInvokeInstruction("storeVariable");
+    private static final MethodInsnNode[] invokeStoreNVariables = new MethodInsnNode[VARIABLE_METHODS];
 
     public static byte[] lineHitsLeft = new byte[100_000];
     private static int nextPassId = 1;
 
     static {
+        for (int i = 0; i < VARIABLE_METHODS; i++)
+            invokeStoreNVariables[i] = getInvokeInstruction("store" + (i + 1) + "Variables");
+
         Arrays.fill(lineHitsLeft, HITS_PER_LINE);
     }
 
-    public static int updateIds(int lineId, int passId) {
+    public static int updateIds(int lineId, int passId, String className, int line) {
         if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
+        return doUpdateIds(lineId, passId, className, line);
+    }
+
+    public static void storeVariable(int passId, int line, String name, Object value) {
+        if (Thread.currentThread() instanceof ToStringThread)
+            return;
+
+        doStoreVariable(passId, line, name, value);
+    }
+
+    public static int store1Variables(int lineId, int passId, String className, int line,
+                                      String name1, Object value1) {
+        if (Thread.currentThread() instanceof ToStringThread)
+            return passId;
+
+        passId = doUpdateIds(lineId, passId, className, line);
+        doStoreVariable(passId, line, name1, value1);
+
+        return passId;
+    }
+
+    public static int store2Variables(int lineId, int passId, String className, int line,
+                                      String name1, Object value1,
+                                      String name2, Object value2) {
+        if (Thread.currentThread() instanceof ToStringThread)
+            return passId;
+
+        passId = doUpdateIds(lineId, passId, className, line);
+        doStoreVariable(passId, line, name1, value1);
+        doStoreVariable(passId, line, name2, value2);
+
+        return passId;
+    }
+
+    public static int store3Variables(int lineId, int passId, String className, int line,
+                                      String name1, Object value1,
+                                      String name2, Object value2,
+                                      String name3, Object value3) {
+        if (Thread.currentThread() instanceof ToStringThread)
+            return passId;
+
+        passId = doUpdateIds(lineId, passId, className, line);
+        doStoreVariable(passId, line, name1, value1);
+        doStoreVariable(passId, line, name2, value2);
+        doStoreVariable(passId, line, name3, value3);
+
+        return passId;
+    }
+
+    public static int store4Variables(int lineId, int passId, String className, int line,
+                                      String name1, Object value1,
+                                      String name2, Object value2,
+                                      String name3, Object value3,
+                                      String name4, Object value4) {
+        if (Thread.currentThread() instanceof ToStringThread)
+            return passId;
+
+        passId = doUpdateIds(lineId, passId, className, line);
+        doStoreVariable(passId, line, name1, value1);
+        doStoreVariable(passId, line, name2, value2);
+        doStoreVariable(passId, line, name3, value3);
+        doStoreVariable(passId, line, name4, value4);
+
+        return passId;
+    }
+
+    private static int doUpdateIds(int lineId, int passId, String className, int line) {
         synchronized (Data.class) {
             if (lineHitsLeft[lineId] > 0)
                 lineHitsLeft[lineId]--;
@@ -40,21 +112,10 @@ public class Data {
                 passId = nextPassId++;
         }
 
-        StackTraceElement[] stack = new Throwable().getStackTrace();
-        String className = stack[1].getClassName();
-        String packageName = className.substring(0, className.lastIndexOf('.'));
-        String file = packageName.replace('.', '/') + '/' + stack[1].getFileName();
-        int line = stack[1].getLineNumber();
-
         return passId;
     }
 
-    public static void storeVariable(String name, Object value, int passId) {
-        if (Thread.currentThread() instanceof ToStringThread)
-            return;
-
-        StackTraceElement[] stack = new Throwable().getStackTrace();
-        int line = stack[1].getLineNumber();
+    private static void doStoreVariable(int passId, int line, String name, Object value) {
         String stringValue = objectToString(value);
     }
 
@@ -76,12 +137,8 @@ public class Data {
         return invokeStoreVariable.clone(null);
     }
 
-    private static boolean containsRecursiveInstrumentation(StackTraceElement[] stack) {
-        for (int i = 1; i < stack.length; i++) {
-            if (stack[i].getClassName().equals(Data.class.getName()))
-                return true;
-        }
-        return false;
+    public static AbstractInsnNode getInvokeStoreNVariables(int n) {
+        return invokeStoreNVariables[n - 1].clone(null);
     }
 
     private static String objectToString(Object object) {

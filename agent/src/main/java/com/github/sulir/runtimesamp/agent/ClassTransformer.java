@@ -6,11 +6,13 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.tree.MethodNode;
 
 public class ClassTransformer {
+    private String className;
     private ClassReader reader;
     private TypeHierarchyReader hierarchy;
 
-    public ClassTransformer(byte[] classBytes, TypeHierarchyReader hierarchy) {
-        reader = new ClassReader(classBytes);
+    public ClassTransformer(String className, byte[] classBytes, TypeHierarchyReader hierarchy) {
+        this.className = getTopLevelClass(className);
+        this.reader = new ClassReader(classBytes);
         this.hierarchy = hierarchy;
     }
 
@@ -26,7 +28,7 @@ public class ClassTransformer {
                     @Override
                     public void visitEnd() {
                         if (instructions.size() != 0 && (access & Opcodes.ACC_SYNTHETIC) == 0)
-                            new MethodTransformer(this).transform();
+                            new MethodTransformer(this, className).transform();
 
                         accept(methodVisitor);
                     }
@@ -36,5 +38,12 @@ public class ClassTransformer {
 
         reader.accept(classVisitor, ClassReader.SKIP_FRAMES);
         return writer.toByteArray();
+    }
+
+    private String getTopLevelClass(String className) {
+        if (className.contains("$"))
+            className = className.substring(0, className.indexOf('$'));
+
+        return className.replace('/', '.');
     }
 }
