@@ -9,23 +9,27 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class Data {
-    public static byte[] lineHitsLeft = new byte[100_000];
-    private static int nextPassId = 1;
     private static final byte HITS_PER_LINE = 1;
-
+    private static final ExecutorService executor = Executors.newCachedThreadPool(new ToStringThread.Factory());
     private static final FieldInsnNode readLineHitsLeft = getReadHitsInstruction();
     private static final MethodInsnNode invokeUpdateIds = getInvokeInstruction("updateIds");
     private static final MethodInsnNode invokeStoreVariable = getInvokeInstruction("storeVariable");
+
+    public static byte[] lineHitsLeft = new byte[100_000];
+    private static int nextPassId = 1;
 
     static {
         Arrays.fill(lineHitsLeft, HITS_PER_LINE);
     }
 
     public static int updateIds(int lineId, int passId) {
-        StackTraceElement[] stack = new Throwable().getStackTrace();
-        if (containsRecursiveInstrumentation(stack))
+        if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
         synchronized (Data.class) {
@@ -36,6 +40,7 @@ public class Data {
                 passId = nextPassId++;
         }
 
+        StackTraceElement[] stack = new Throwable().getStackTrace();
         String className = stack[1].getClassName();
         String packageName = className.substring(0, className.lastIndexOf('.'));
         String file = packageName.replace('.', '/') + '/' + stack[1].getFileName();
@@ -45,10 +50,11 @@ public class Data {
     }
 
     public static void storeVariable(String name, Object value, int passId) {
-        StackTraceElement[] stack = new Throwable().getStackTrace();
-        if (containsRecursiveInstrumentation(stack))
+        if (Thread.currentThread() instanceof ToStringThread)
             return;
 
+        StackTraceElement[] stack = new Throwable().getStackTrace();
+        int line = stack[1].getLineNumber();
         String stringValue = objectToString(value);
     }
 
@@ -79,13 +85,14 @@ public class Data {
     }
 
     private static String objectToString(Object object) {
+        if (object == null)
+            return "null";
+
         try {
-            if (object == null)
-                return "null";
-            else
-                return object.toString();
+            Future<String> futureValue = executor.submit(object::toString);
+            return futureValue.get(100, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            return  object.getClass().getName() + "@" + Integer.toHexString(object.hashCode());
+            return object.getClass().getName() + "@" + Integer.toHexString(object.hashCode());
         }
     }
 
