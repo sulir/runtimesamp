@@ -70,14 +70,15 @@ public class MethodTransformer {
 
     private void generateInstrumentation(ControlNode node) {
         int lineId = lineMap.getLineId(node.getInstruction());
+        LabelNode skipRecording = new LabelNode();
         LabelNode skipToEnd = new LabelNode();
 
         skipIfLineWillStay(node, skipToEnd);
-        skipIfNoHitsLeft(lineId, skipToEnd);
+        skipIfNoHitsLeft(lineId, skipRecording);
         updateIds(lineId);
         storeVariables();
+        inserted.add(skipRecording);
         resetPassIfBackward(node, skipToEnd);
-
         inserted.add(skipToEnd);
     }
 
