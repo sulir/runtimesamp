@@ -15,36 +15,28 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public class Data {
-    public static int VARIABLE_METHODS = 4;
+    public static final int MAX_VARIABLE_ARGS = 3;
     private static final byte HITS_PER_LINE = 1;
     private static final ExecutorService executor = Executors.newCachedThreadPool(new ToStringThread.Factory());
     private static final FieldInsnNode readLineHitsLeft = getReadHitsInstruction();
-    private static final MethodInsnNode invokeUpdateIds = getInvokeInstruction("updateIds");
-    private static final MethodInsnNode invokeStoreVariable = getInvokeInstruction("storeVariable");
-    private static final MethodInsnNode[] invokeStoreNVariables = new MethodInsnNode[VARIABLE_METHODS];
+    private static final MethodInsnNode[] invokeStoreVariables = new MethodInsnNode[MAX_VARIABLE_ARGS + 1];
+    private static final MethodInsnNode invokeStoreNVariables = getInvokeInstruction("storeNVariables");
 
     public static byte[] lineHitsLeft = new byte[100_000];
     private static int nextPassId = 1;
 
     static {
-        for (int i = 0; i < VARIABLE_METHODS; i++)
-            invokeStoreNVariables[i] = getInvokeInstruction("store" + (i + 1) + "Variables");
+        for (int i = 0; i <= MAX_VARIABLE_ARGS; i++)
+            invokeStoreVariables[i] = getInvokeInstruction("store" + i + "Variables");
 
         Arrays.fill(lineHitsLeft, HITS_PER_LINE);
     }
 
-    public static int updateIds(int lineId, int passId, String className, int line) {
+    public static int store0Variables(int lineId, int passId, String className, int line) {
         if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
-        return doUpdateIds(lineId, passId, className, line);
-    }
-
-    public static void storeVariable(int passId, int line, String name, Object value) {
-        if (Thread.currentThread() instanceof ToStringThread)
-            return;
-
-        doStoreVariable(passId, line, name, value);
+        return updateIds(lineId, passId, className, line);
     }
 
     public static int store1Variables(int lineId, int passId, String className, int line,
@@ -52,8 +44,8 @@ public class Data {
         if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
-        passId = doUpdateIds(lineId, passId, className, line);
-        doStoreVariable(passId, line, name1, value1);
+        passId = updateIds(lineId, passId, className, line);
+        storeVariable(passId, line, name1, value1);
 
         return passId;
     }
@@ -64,9 +56,9 @@ public class Data {
         if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
-        passId = doUpdateIds(lineId, passId, className, line);
-        doStoreVariable(passId, line, name1, value1);
-        doStoreVariable(passId, line, name2, value2);
+        passId = updateIds(lineId, passId, className, line);
+        storeVariable(passId, line, name1, value1);
+        storeVariable(passId, line, name2, value2);
 
         return passId;
     }
@@ -78,32 +70,28 @@ public class Data {
         if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
-        passId = doUpdateIds(lineId, passId, className, line);
-        doStoreVariable(passId, line, name1, value1);
-        doStoreVariable(passId, line, name2, value2);
-        doStoreVariable(passId, line, name3, value3);
+        passId = updateIds(lineId, passId, className, line);
+        storeVariable(passId, line, name1, value1);
+        storeVariable(passId, line, name2, value2);
+        storeVariable(passId, line, name3, value3);
 
         return passId;
     }
 
-    public static int store4Variables(int lineId, int passId, String className, int line,
-                                      String name1, Object value1,
-                                      String name2, Object value2,
-                                      String name3, Object value3,
-                                      String name4, Object value4) {
+    public static int storeNVariables(int lineId, int passId, String className, int line,
+                                      String[] names, Object[] values) {
         if (Thread.currentThread() instanceof ToStringThread)
             return passId;
 
-        passId = doUpdateIds(lineId, passId, className, line);
-        doStoreVariable(passId, line, name1, value1);
-        doStoreVariable(passId, line, name2, value2);
-        doStoreVariable(passId, line, name3, value3);
-        doStoreVariable(passId, line, name4, value4);
+        passId = updateIds(lineId, passId, className, line);
+
+        for (int i = 0; i < names.length; i++)
+            storeVariable(passId, line, names[i], values[i]);
 
         return passId;
     }
 
-    private static int doUpdateIds(int lineId, int passId, String className, int line) {
+    private static int updateIds(int lineId, int passId, String className, int line) {
         synchronized (Data.class) {
             if (lineHitsLeft[lineId] > 0)
                 lineHitsLeft[lineId]--;
@@ -115,7 +103,7 @@ public class Data {
         return passId;
     }
 
-    private static void doStoreVariable(int passId, int line, String name, Object value) {
+    private static void storeVariable(int passId, int line, String name, Object value) {
         String stringValue = objectToString(value);
     }
 
@@ -129,16 +117,11 @@ public class Data {
         return readLineHitsLeft.clone(null);
     }
 
-    public static AbstractInsnNode getInvokeUpdateIds() {
-        return invokeUpdateIds.clone(null);
-    }
-
-    public static AbstractInsnNode getInvokeStoreVariable() {
-        return invokeStoreVariable.clone(null);
-    }
-
-    public static AbstractInsnNode getInvokeStoreNVariables(int n) {
-        return invokeStoreNVariables[n - 1].clone(null);
+    public static AbstractInsnNode getInvokeStoreVariables(int n) {
+        if (n <= MAX_VARIABLE_ARGS)
+            return invokeStoreVariables[n].clone(null);
+        else
+            return invokeStoreNVariables.clone(null);
     }
 
     private static String objectToString(Object object) {

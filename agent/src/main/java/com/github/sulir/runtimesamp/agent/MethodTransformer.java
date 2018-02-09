@@ -7,6 +7,7 @@ import org.objectweb.asm.util.Printer;
 import org.objectweb.asm.util.Textifier;
 import org.objectweb.asm.util.TraceMethodVisitor;
 
+import java.util.Arrays;
 import java.util.Iterator;
 
 public class MethodTransformer {
@@ -73,14 +74,7 @@ public class MethodTransformer {
         skipIfLineWillStay(node, skipToEnd);
         skipIfNoHitsLeft(lineId, skipRecording);
 
-        Variable[] variables = variableMap.getVariablesAtLine();
-
-        if (variables.length >= 1 && variables.length <= Data.VARIABLE_METHODS) {
-            storeNVariables(lineId, line, variables);
-        } else {
-            updateIds(lineId, line);
-            storeVariables(line, variables);
-        }
+        storeVariables(lineId, line);
 
         inserted.add(skipRecording);
         resetPassIfBackward(node, skipToEnd);
@@ -101,32 +95,30 @@ public class MethodTransformer {
         inserted.add(new JumpInsnNode(Opcodes.IFEQ, skip));
     }
 
-    private void storeNVariables(int lineId, int line, Variable[] variables) {
-        inserted.add(getLineArguments(lineId, line));
+    private void storeVariables(int lineId, int line) {
+        inserted.add(getPushInstruction(lineId));
+        inserted.add(new VarInsnNode(Opcodes.ILOAD, passVariable));
+        inserted.add(new LdcInsnNode(className));
+        inserted.add(getPushInstruction(line));
 
-        for (Variable variable : variables) {
-            inserted.add(new LdcInsnNode(variable.getName()));
-            inserted.add(variable.getBoxedLoad());
+        Variable[] variables = variableMap.getVariablesAtLine();
+
+        if (variables.length <= Data.MAX_VARIABLE_ARGS) {
+            for (Variable variable : variables) {
+                inserted.add(new LdcInsnNode(variable.getName()));
+                inserted.add(variable.getBoxedLoad());
+            }
+        } else {
+            InsnList[] names = Arrays.stream(variables)
+                    .map((v) -> getList(new LdcInsnNode(v.getName()))).toArray(InsnList[]::new);
+            inserted.add(getArrayInstructions(names, "java/lang/String"));
+
+            InsnList[] values = Arrays.stream(variables).map(Variable::getBoxedLoad).toArray(InsnList[]::new);
+            inserted.add(getArrayInstructions(values, "java/lang/Object"));
         }
 
-        inserted.add(Data.getInvokeStoreNVariables(variables.length));
+        inserted.add(Data.getInvokeStoreVariables(variables.length));
         inserted.add(new VarInsnNode(Opcodes.ISTORE, passVariable));
-    }
-
-    private void updateIds(int lineId, int line) {
-        inserted.add(getLineArguments(lineId, line));
-        inserted.add(Data.getInvokeUpdateIds());
-        inserted.add(new VarInsnNode(Opcodes.ISTORE, passVariable));
-    }
-
-    private void storeVariables(int line, Variable[] variables) {
-        for (Variable variable : variables) {
-            inserted.add(new VarInsnNode(Opcodes.ILOAD, passVariable));
-            inserted.add(getPushInstruction(line));
-            inserted.add(new LdcInsnNode(variable.getName()));
-            inserted.add(variable.getBoxedLoad());
-            inserted.add(Data.getInvokeStoreVariable());
-        }
     }
 
     private void resetPassIfBackward(ControlNode node, LabelNode skip) {
@@ -142,29 +134,45 @@ public class MethodTransformer {
     }
 
     private InsnList getResetPass() {
-        InsnList resetPass = new InsnList();
-        resetPass.add(new InsnNode(Opcodes.ICONST_0));
-        resetPass.add(new VarInsnNode(Opcodes.ISTORE, passVariable));
-        return resetPass;
+        return getList(new InsnNode(Opcodes.ICONST_0), new VarInsnNode(Opcodes.ISTORE, passVariable));
     }
 
-    private InsnList getLineArguments(int lineId, int line) {
-        InsnList arguments = new InsnList();
-        arguments.add(getPushInstruction(lineId));
-        arguments.add(new VarInsnNode(Opcodes.ILOAD, passVariable));
-        arguments.add(new LdcInsnNode(className));
-        arguments.add(getPushInstruction(line));
-        return arguments;
+    private InsnList getArrayInstructions(InsnList[] elements, String type) {
+        InsnList list = new InsnList();
+
+        list.add(getPushInstruction(elements.length));
+        list.add(new TypeInsnNode(Opcodes.ANEWARRAY, type));
+
+        for (int i = 0; i < elements.length; i++) {
+            list.add(new InsnNode(Opcodes.DUP));
+            list.add(getPushInstruction(i));
+            list.add(elements[i]);
+            list.add(new InsnNode(Opcodes.AASTORE));
+        }
+
+        return list;
     }
 
     private AbstractInsnNode getPushInstruction(int constant) {
-        if (constant <= Byte.MAX_VALUE) {
+        if (constant >= -1 && constant <= 5)
+            return new InsnNode(Opcodes.ICONST_0 + constant);
+
+        if (constant >= Byte.MIN_VALUE && constant <= Byte.MAX_VALUE)
             return new IntInsnNode(Opcodes.BIPUSH, constant);
-        } else if (constant <= Short.MAX_VALUE) {
+
+        if (constant >= Short.MIN_VALUE && constant <= Short.MAX_VALUE)
             return new IntInsnNode(Opcodes.SIPUSH, constant);
-        } else {
-            return new LdcInsnNode(constant);
-        }
+
+        return new LdcInsnNode(constant);
+    }
+
+    private InsnList getList(AbstractInsnNode... instructions) {
+        InsnList list = new InsnList();
+
+        for (AbstractInsnNode instruction : instructions)
+            list.add(instruction);
+
+        return list;
     }
 
     private void printInstructions() {
