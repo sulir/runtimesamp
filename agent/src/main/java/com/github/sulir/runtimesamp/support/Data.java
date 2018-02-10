@@ -5,6 +5,8 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -15,15 +17,23 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public class Data {
-    public static final int MAX_VARIABLE_ARGS = 3;
     private static final byte HITS_PER_LINE = 1;
-    private static final ExecutorService executor = Executors.newCachedThreadPool(new ToStringThread.Factory());
+    public static byte[] lineHitsLeft = new byte[100_000];
+    private static int nextPass = 1;
+
+    private static final ExecutorService stringService = Executors.newCachedThreadPool(new ToStringThread.Factory());
+    private static final ExecutorService dbService = Executors.newSingleThreadExecutor();
+    private static final Jedis redis = new Jedis("localhost");
+    private static final String EXECUTION_KEY = "next-execution-id";
+    private static final String executionId = redis.incr(EXECUTION_KEY).toString();
+
     private static final FieldInsnNode readLineHitsLeft = getReadHitsInstruction();
+    public static final int MAX_VARIABLE_ARGS = 3;
     private static final MethodInsnNode[] invokeStoreVariables = new MethodInsnNode[MAX_VARIABLE_ARGS + 1];
     private static final MethodInsnNode invokeStoreNVariables = getInvokeInstruction("storeNVariables");
 
-    public static byte[] lineHitsLeft = new byte[100_000];
-    private static int nextPassId = 1;
+    private static final String[] NO_NAMES = {};
+    private static final Object[] NO_VALUES = {};
 
     static {
         for (int i = 0; i <= MAX_VARIABLE_ARGS; i++)
@@ -32,79 +42,68 @@ public class Data {
         Arrays.fill(lineHitsLeft, HITS_PER_LINE);
     }
 
-    public static int store0Variables(int lineId, int passId, String className, int line) {
-        if (Thread.currentThread() instanceof ToStringThread)
-            return passId;
-
-        return updateIds(lineId, passId, className, line);
+    public static int store0Variables(int lineId, int pass, String className, int line) {
+        return storeNVariables(lineId, pass, className, line, NO_NAMES, NO_VALUES);
     }
 
-    public static int store1Variables(int lineId, int passId, String className, int line,
+    public static int store1Variables(int lineId, int pass, String className, int line,
                                       String name1, Object value1) {
-        if (Thread.currentThread() instanceof ToStringThread)
-            return passId;
-
-        passId = updateIds(lineId, passId, className, line);
-        storeVariable(passId, line, name1, value1);
-
-        return passId;
+        return storeNVariables(lineId, pass, className, line, new String[] {name1}, new Object[] {value1});
     }
 
-    public static int store2Variables(int lineId, int passId, String className, int line,
+    public static int store2Variables(int lineId, int pass, String className, int line,
                                       String name1, Object value1,
                                       String name2, Object value2) {
-        if (Thread.currentThread() instanceof ToStringThread)
-            return passId;
-
-        passId = updateIds(lineId, passId, className, line);
-        storeVariable(passId, line, name1, value1);
-        storeVariable(passId, line, name2, value2);
-
-        return passId;
+        return storeNVariables(lineId, pass, className, line, new String[] {name1, name2},
+                new Object[] {value1, value2});
     }
 
-    public static int store3Variables(int lineId, int passId, String className, int line,
+    public static int store3Variables(int lineId, int pass, String className, int line,
                                       String name1, Object value1,
                                       String name2, Object value2,
                                       String name3, Object value3) {
-        if (Thread.currentThread() instanceof ToStringThread)
-            return passId;
-
-        passId = updateIds(lineId, passId, className, line);
-        storeVariable(passId, line, name1, value1);
-        storeVariable(passId, line, name2, value2);
-        storeVariable(passId, line, name3, value3);
-
-        return passId;
+        return storeNVariables(lineId, pass, className, line, new String[] {name1, name2, name3},
+                new Object[] {value1, value2, value3});
     }
 
-    public static int storeNVariables(int lineId, int passId, String className, int line,
+    @SuppressWarnings("WeakerAccess")
+    public static int storeNVariables(int lineId, int pass, String className, int line,
                                       String[] names, Object[] values) {
         if (Thread.currentThread() instanceof ToStringThread)
-            return passId;
+            return pass;
 
-        passId = updateIds(lineId, passId, className, line);
-
-        for (int i = 0; i < names.length; i++)
-            storeVariable(passId, line, names[i], values[i]);
-
-        return passId;
-    }
-
-    private static int updateIds(int lineId, int passId, String className, int line) {
+        final int newPass;
         synchronized (Data.class) {
             if (lineHitsLeft[lineId] > 0)
                 lineHitsLeft[lineId]--;
 
-            if (passId == 0)
-                passId = nextPassId++;
+            newPass = (pass == 0) ? nextPass++ : pass;
         }
 
-        return passId;
-    }
+        String[] stringValues = new String[values.length];
+        for (int i = 0; i < values.length; i++)
+            stringValues[i] = objectToString(values[i]);
 
-    private static void storeVariable(int passId, int line, String name, Object value) {
-        String stringValue = objectToString(value);
+        dbService.submit(() -> {
+            Pipeline pipeline = redis.pipelined();
+            pipeline.rpush("line:" + className + ":" + line, "pass:" + executionId + ":" + newPass);
+
+            String[] dbValues;
+            if (names.length == 0) {
+                dbValues = new String[] {String.valueOf(line)};
+            } else {
+                dbValues = new String[names.length];
+                for (int i = 0; i < names.length; i++) {
+                    dbValues[i] = String.join(":", String.valueOf(line), names[i], stringValues[i]);
+                }
+
+            }
+
+            pipeline.rpush("pass:" + executionId + ":" + pass, dbValues);
+            pipeline.sync();
+        });
+
+        return newPass;
     }
 
     public static synchronized void increaseHitsCapacity() {
@@ -129,7 +128,7 @@ public class Data {
             return "null";
 
         try {
-            Future<String> futureValue = executor.submit(object::toString);
+            Future<String> futureValue = stringService.submit(object::toString);
             return futureValue.get(100, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             return object.getClass().getName() + "@" + Integer.toHexString(object.hashCode());
