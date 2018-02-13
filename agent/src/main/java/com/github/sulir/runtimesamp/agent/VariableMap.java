@@ -1,24 +1,34 @@
 package com.github.sulir.runtimesamp.agent;
 
-import org.objectweb.asm.Label;
 import org.objectweb.asm.tree.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class VariableMap {
-    private Map<Label, List<LocalVariableNode>> starts;
-    private Map<Label, List<LocalVariableNode>> ends;
+    private Map<LabelNode, List<LocalVariableNode>> starts;
+    private Map<LabelNode, List<LocalVariableNode>> ends;
     private Map<Integer, LocalVariableNode> localVariablesInScope = new HashMap<>();
     private Map<String, Variable> variablesAtLine = new LinkedHashMap<>();
 
     public VariableMap(MethodNode method) {
-        starts = method.localVariables.stream().collect(Collectors.groupingBy(var -> var.start.getLabel()));
-        ends = method.localVariables.stream().collect(Collectors.groupingBy(var -> var.end.getLabel()));
+        starts = method.localVariables.stream().collect(Collectors.groupingBy(var -> var.start));
+        ends = method.localVariables.stream().collect(Collectors.groupingBy(var -> var.end));
     }
 
-    public LocalVariableNode getLocalVariable(int index) {
-        return localVariablesInScope.get(index);
+    public LocalVariableNode getLocalVariable(VarInsnNode instruction) {
+        LocalVariableNode variable = localVariablesInScope.get(instruction.var);
+
+        if (variable == null && instruction.getNext() instanceof LabelNode) {
+            List<LocalVariableNode> nextLocals = starts.getOrDefault(instruction.getNext(), Collections.emptyList());
+
+            for (LocalVariableNode local : nextLocals) {
+                if (local.index == instruction.var)
+                    return local;
+            }
+        }
+
+        return variable;
     }
 
     public Variable[] getVariablesAtLine() {
@@ -41,11 +51,11 @@ public class VariableMap {
     }
 
     private void updateScope(LabelNode label) {
-        for (LocalVariableNode variable : starts.getOrDefault(label.getLabel(), new ArrayList<>(0))) {
+        for (LocalVariableNode variable : starts.getOrDefault(label, Collections.emptyList())) {
             localVariablesInScope.put(variable.index, variable);
         }
 
-        for (LocalVariableNode varToRemove : ends.getOrDefault(label.getLabel(), new ArrayList<>(0))) {
+        for (LocalVariableNode varToRemove : ends.getOrDefault(label, Collections.emptyList())) {
             localVariablesInScope.remove(varToRemove.index);
 
             Iterator<Map.Entry<String, Variable>> variables = variablesAtLine.entrySet().iterator();

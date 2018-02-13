@@ -10,7 +10,7 @@ public class LocalVariable extends Variable {
     private int index;
 
     public static Variable fromInstruction(VarInsnNode instruction, VariableMap map) {
-        LocalVariableNode variable = map.getLocalVariable(instruction.var);
+        LocalVariableNode variable = map.getLocalVariable(instruction);
 
         if (variable != null && isNotSynthetic(variable.name) && instruction.getOpcode() != Opcodes.RET)
             return new LocalVariable(variable.name, Type.getType(variable.desc), variable.index);
