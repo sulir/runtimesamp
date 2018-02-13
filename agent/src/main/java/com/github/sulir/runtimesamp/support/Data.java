@@ -8,9 +8,11 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.StringJoiner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,6 +36,7 @@ public class Data {
 
     private static final String[] NO_NAMES = {};
     private static final Object[] NO_VALUES = {};
+    private static final int VALUE_LENGTH = 120;
 
     static {
         for (int i = 0; i <= MAX_VARIABLE_ARGS; i++)
@@ -86,7 +89,8 @@ public class Data {
 
         dbService.submit(() -> {
             Pipeline pipeline = redis.pipelined();
-            pipeline.rpush("line:" + className + ":" + line, "pass:" + executionId + ":" + newPass);
+            String passName = "pass:" + executionId + ":" + newPass;
+            pipeline.rpush("line:" + className + ":" + line, passName);
 
             String[] dbValues;
             if (names.length == 0) {
@@ -99,7 +103,7 @@ public class Data {
 
             }
 
-            pipeline.rpush("pass:" + executionId + ":" + pass, dbValues);
+            pipeline.rpush(passName, dbValues);
             pipeline.sync();
         });
 
@@ -128,11 +132,49 @@ public class Data {
             return "null";
 
         try {
-            Future<String> futureValue = stringService.submit(object::toString);
+            Future<String> futureValue = stringService.submit(() -> {
+                Class elementType = object.getClass().getComponentType();
+
+                if (elementType != null && (elementType.isPrimitive() || elementType == String.class)) {
+                    int length = Array.getLength(object);
+                    StringJoiner joiner = new StringJoiner(", ", "{", "}");
+
+                    for (int i = 0; i < length; i++) {
+                        if (joiner.length() >= VALUE_LENGTH) {
+                            joiner.add("...");
+                            break;
+                        }
+                        joiner.add(elementToString(Array.get(object, i)));
+                    }
+
+                    return joiner.toString();
+                } else {
+                    return elementToString(object);
+                }
+            });
             return futureValue.get(100, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            return object.getClass().getName() + "@" + Integer.toHexString(object.hashCode());
+            return defaultToString(object);
         }
+    }
+
+    private static String elementToString(Object object) throws Exception {
+        if (object.getClass().getMethod("toString").getDeclaringClass() == Object.class)
+            return defaultToString(object);
+
+        String string = String.valueOf(object);
+
+        if (string.length() > VALUE_LENGTH + 3)
+            string = string.substring(0, VALUE_LENGTH) + "...";
+
+        if (object instanceof String)
+            string = '"' + string + '"';
+
+        return string;
+    }
+
+    private static String defaultToString(Object object) {
+        return object.getClass().getSimpleName() + "@" + Integer.toHexString(object.hashCode());
     }
 
     private static FieldInsnNode getReadHitsInstruction() {
