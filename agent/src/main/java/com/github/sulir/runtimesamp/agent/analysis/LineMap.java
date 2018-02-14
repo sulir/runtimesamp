@@ -1,4 +1,4 @@
-package com.github.sulir.runtimesamp.agent;
+package com.github.sulir.runtimesamp.agent.analysis;
 
 import com.github.sulir.runtimesamp.support.Data;
 import org.objectweb.asm.tree.AbstractInsnNode;

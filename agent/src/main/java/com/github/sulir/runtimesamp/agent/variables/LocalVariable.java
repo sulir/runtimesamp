@@ -1,4 +1,4 @@
-package com.github.sulir.runtimesamp.agent;
+package com.github.sulir.runtimesamp.agent.variables;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;

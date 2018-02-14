@@ -1,5 +1,11 @@
 package com.github.sulir.runtimesamp.agent;
 
+import com.github.sulir.runtimesamp.agent.analysis.Branch;
+import com.github.sulir.runtimesamp.agent.analysis.ControlNode;
+import com.github.sulir.runtimesamp.agent.analysis.FieldAnalyzer;
+import com.github.sulir.runtimesamp.agent.analysis.LineMap;
+import com.github.sulir.runtimesamp.agent.variables.Variable;
+import com.github.sulir.runtimesamp.agent.variables.VariableMap;
 import com.github.sulir.runtimesamp.support.Data;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
