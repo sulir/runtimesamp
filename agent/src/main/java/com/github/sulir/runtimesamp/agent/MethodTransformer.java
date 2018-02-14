@@ -84,7 +84,7 @@ public class MethodTransformer {
     private void skipIfLineWillStay(ControlNode node, LabelNode skip) {
         for (Branch branch : node.getBranches()) {
             if (branch.getDirection() == Branch.Direction.SAME_LINE)
-                branch.getConditionalJump(skip);
+                inserted.add(branch.getConditionalJump(skip));
         }
     }
 
