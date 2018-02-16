@@ -35,7 +35,7 @@ public abstract class Variable {
             if (instruction.getOpcode() == Opcodes.GETFIELD || instruction.getOpcode() == Opcodes.PUTFIELD)
                 return InstanceVariable.fromInstruction((FieldInsnNode) instruction, transformer.getFieldAnalyzer());
         } else if (instruction instanceof VarInsnNode) {
-            return LocalVariable.fromInstruction((VarInsnNode) instruction, transformer.getVariableMap());
+            return LocalVariable.fromInstruction(instruction, transformer.getVariableMap());
         }
         return null;
     }

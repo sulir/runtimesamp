@@ -1,7 +1,10 @@
 package com.github.sulir.runtimesamp.agent.variables;
 
 import com.github.sulir.runtimesamp.agent.MethodTransformer;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LocalVariableNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,14 +20,14 @@ public class VariableMap {
         ends = method.localVariables.stream().collect(Collectors.groupingBy(var -> var.end));
     }
 
-    public LocalVariableNode getLocalVariable(VarInsnNode instruction) {
-        LocalVariableNode variable = localVariablesInScope.get(instruction.var);
+    public LocalVariableNode getLocalVariable(int index, AbstractInsnNode instruction) {
+        LocalVariableNode variable = localVariablesInScope.get(index);
 
         if (variable == null && instruction.getNext() instanceof LabelNode) {
             List<LocalVariableNode> nextLocals = starts.getOrDefault(instruction.getNext(), Collections.emptyList());
 
             for (LocalVariableNode local : nextLocals) {
-                if (local.index == instruction.var)
+                if (local.index == index)
                     return local;
             }
         }
