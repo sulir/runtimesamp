@@ -1,4 +1,4 @@
-package com.sulir.github.runtimesamp.plugin;
+package com.github.sulir.runtimesamp.plugin;
 
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.editor.Editor;

@@ -1,4 +1,4 @@
-package com.sulir.github.runtimesamp.plugin;
+package com.github.sulir.runtimesamp.plugin;
 
 import redis.clients.jedis.Jedis;
 

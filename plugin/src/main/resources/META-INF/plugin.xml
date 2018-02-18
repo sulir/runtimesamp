@@ -10,8 +10,8 @@
     <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <projectService serviceImplementation="com.sulir.github.runtimesamp.plugin.VariableValueService"/>
-        <editor.linePainter implementation="com.sulir.github.runtimesamp.plugin.VariableLinePainter"/>
+        <projectService serviceImplementation="com.github.sulir.runtimesamp.plugin.VariableValueService"/>
+        <editor.linePainter implementation="com.github.sulir.runtimesamp.plugin.VariableLinePainter"/>
     </extensions>
 
     <actions>
