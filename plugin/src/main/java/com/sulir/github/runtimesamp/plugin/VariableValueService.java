@@ -59,6 +59,10 @@ public class VariableValueService {
         }
     }
 
+    void invalidateData() {
+        db.flushDB();
+    }
+
     private String getClassName(Editor editor) {
         return getClassName(FileDocumentManager.getInstance().getFile(editor.getDocument()));
     }

@@ -10,6 +10,8 @@ To build both the Java agent and the IDE plugin, run the command:
 
 ## Running
 
+First, [Redis](https://redis.io) must be running on localhost.
+
 To open IntelliJ IDEA with the plugin installed, use the command:
 
     ./gradlew runIde

@@ -3,12 +3,14 @@ package com.sulir.github.runtimesamp.plugin;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.event.CaretEvent;
 import com.intellij.openapi.editor.event.CaretListener;
+import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 
-public class LineChangeListener implements FileEditorManagerListener, CaretListener {
+public class LineChangeListener implements FileEditorManagerListener, CaretListener, DocumentListener {
     private Project project;
 
     public LineChangeListener(Project project) {
@@ -18,6 +20,7 @@ public class LineChangeListener implements FileEditorManagerListener, CaretListe
     public void register() {
         project.getMessageBus().connect().subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
         EditorFactory.getInstance().getEventMulticaster().addCaretListener(this, project);
+        EditorFactory.getInstance().getEventMulticaster().addDocumentListener(this, project);
     }
 
     @Override
@@ -37,5 +40,10 @@ public class LineChangeListener implements FileEditorManagerListener, CaretListe
             VariableValueService.getInstance(project).updateVariables();
             e.getEditor().getComponent().repaint();
         }
+    }
+
+    @Override
+    public void documentChanged(DocumentEvent event) {
+        VariableValueService.getInstance(project).invalidateData();
     }
 }
