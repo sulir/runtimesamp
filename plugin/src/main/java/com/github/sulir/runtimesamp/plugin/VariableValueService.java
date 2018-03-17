@@ -14,6 +14,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.util.List;
+import java.util.Set;
 
 public class VariableValueService {
     private final Jedis db = new Jedis("localhost");
@@ -60,7 +61,13 @@ public class VariableValueService {
     }
 
     void invalidateData() {
-        db.flushDB();
+        Set<String> keys = db.keys("pass:*");
+        keys.addAll(db.keys("line:*"));
+
+        for (String key : keys)
+            db.del(key);
+
+        updateVariables();
     }
 
     private String getClassName(Editor editor) {
