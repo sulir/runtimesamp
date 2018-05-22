@@ -5,6 +5,7 @@ import com.intellij.openapi.editor.event.CaretEvent;
 import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
@@ -44,6 +45,7 @@ public class LineChangeListener implements FileEditorManagerListener, CaretListe
 
     @Override
     public void documentChanged(DocumentEvent event) {
-        VariableValueService.getInstance(project).invalidateData();
+        if (FileDocumentManager.getInstance().getFile(event.getDocument()) != null)
+            VariableValueService.getInstance(project).invalidateData();
     }
 }

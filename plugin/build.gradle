@@ -3,7 +3,7 @@ plugins {
 }
 
 intellij {
-    version '2017.3.4'
+    version '2018.1.4'
 }
 
 patchPluginXml {
