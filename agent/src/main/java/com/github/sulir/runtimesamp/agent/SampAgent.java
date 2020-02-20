@@ -1,6 +1,8 @@
 package com.github.sulir.runtimesamp.agent;
 
+import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
+import java.security.ProtectionDomain;
 import java.util.regex.Pattern;
 
 public class SampAgent {
@@ -15,19 +17,23 @@ public class SampAgent {
             exclude = Pattern.compile("");
         }
 
-        inst.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            try {
-                if (className != null && include.matcher(className).matches()
-                        && !exclude.matcher(className).matches()) {
-                    hierarchy.setClassLoader(loader);
-                    ClassTransformer transformer = new ClassTransformer(className, classfileBuffer, hierarchy);
-                    return transformer.transform();
+        inst.addTransformer(new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                    ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+                try {
+                    if (className != null && include.matcher(className).matches()
+                            && !exclude.matcher(className).matches()) {
+                        hierarchy.setClassLoader(loader);
+                        ClassTransformer transformer = new ClassTransformer(className, classfileBuffer, hierarchy);
+                        return transformer.transform();
+                    }
+                } catch (Throwable e) {
+                    e.printStackTrace();
                 }
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
 
-            return null;
+                return null;
+            }
         });
     }
 }
