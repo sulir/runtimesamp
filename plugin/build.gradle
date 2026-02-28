@@ -1,9 +1,11 @@
 plugins {
-    id 'org.jetbrains.intellij' version '0.4.16'
+    id 'org.jetbrains.intellij' version '1.17.3'
 }
 
 intellij {
-    version '2018.1.4'
+    version = '2019.2.4'
+    plugins = ['java']
+    buildSearchableOptions.enabled = false
 }
 
 patchPluginXml {
@@ -11,10 +13,9 @@ patchPluginXml {
 }
 
 buildPlugin {
-    destinationDir project.file('../dist')
+    destinationDirectory = project.file('../dist')
 }
 
 clean {
-    //noinspection GroovyAssignabilityCheck
     delete buildPlugin.archiveFile
 }
